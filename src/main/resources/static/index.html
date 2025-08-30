@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Hotel Reservation</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(to right, #f9fafb, #eef2ff);
+            margin: 0; padding: 20px;
+            color: #1f2937;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 10px;
+            color: #111827;
+        }
+
+        p {
+            text-align: center;
+            color: #374151;
+            margin-bottom: 20px;
+        }
+
+        /* Cards */
+        .card {
+            background: white;
+            padding: 15px 20px;
+            margin: 15px auto;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            max-width: 900px;
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+            justify-content: center;
+        }
+        .controls input {
+            padding: 8px 10px;
+            width: 60px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+        }
+        .controls button {
+            padding: 8px 14px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            color: white;
+            font-weight: 500;
+            transition: 0.2s;
+        }
+        .book { background:#2563eb; }
+        .book:hover { background:#1e40af; box-shadow:0 0 8px rgba(37,99,235,0.5); }
+        .randomize { background:#4b5563; }
+        .randomize:hover { background:#1f2937; box-shadow:0 0 8px rgba(75,85,99,0.5); }
+        .reset { background:#dc2626; }
+        .reset:hover { background:#991b1b; box-shadow:0 0 8px rgba(220,38,38,0.5); }
+        .reload { background:#059669; }
+        .reload:hover { background:#065f46; box-shadow:0 0 8px rgba(5,150,105,0.5); }
+
+        /* Summary */
+        #summary strong {
+            font-size: 16px;
+            color: #111827;
+        }
+        #summary div {
+            margin-top: 6px;
+            font-size: 14px;
+            color: #374151;
+        }
+
+        /* Rooms Grid */
+        .rooms { margin-top:20px; }
+        .floor {
+            margin:12px 0;
+            padding: 12px;
+            border-radius: 10px;
+            background:#f9fafb;
+            box-shadow: inset 0 0 4px rgba(0,0,0,0.05);
+        }
+        .floor-label {
+            font-weight:600;
+            margin-bottom:8px;
+        }
+        .floor-rooms {
+            display:flex;
+            flex-wrap:wrap;
+            gap:6px;
+        }
+        .room {
+            width:50px; height:50px;
+            display:flex; justify-content:center; align-items:center;
+            border-radius:10px;
+            font-size:13px; font-weight:500;
+            cursor: pointer;
+            transition:0.2s;
+        }
+        .available {
+            background:#bbf7d0; border:1px solid #22c55e;
+        }
+        .available:hover { transform:scale(1.05); }
+        .booked {
+            background:#fca5a5; border:1px solid #ef4444;
+            text-decoration: line-through;
+            color:#991b1b;
+        }
+        .just {
+            background:#fde047; border:1px solid #facc15;
+            font-weight:bold;
+        }
+
+        /* Legend */
+        .legend {
+            margin: 10px 0;
+            text-align: center;
+        }
+        .legend span {
+            padding:4px 8px; margin:4px;
+            border-radius:6px; font-size:13px; font-weight:500;
+            display:inline-block;
+        }
+
+        /* Raw JSON */
+        #apiResponse {
+            margin-top:15px;
+            background:#111827;
+            color:#f9fafb;
+            padding:10px;
+            border-radius:8px;
+            font-size:12px;
+            max-height:250px;
+            overflow:auto;
+        }
+
+        /* Toast */
+        #toast {
+            position:fixed; top:20px; right:20px;
+            background:#333; color:white; padding:10px 15px;
+            border-radius:6px; display:none; z-index:9999;
+            box-shadow:0 4px 8px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body>
+<h1>🏨 Hotel Room Reservation</h1>
+<p>Book up to 5 rooms. Same floor preferred, else nearest by travel time.</p>
+
+<!-- Summary -->
+<div class="card" id="summary">
+    <strong>Hotel Status:</strong>
+    <div>
+        Total: <span id="total">0</span> |
+        Available: <span id="available">0</span> |
+        Booked: <span id="booked">0</span> |
+        Just Booked: <span id="justBooked">0</span>
+    </div>
+</div>
+
+<!-- Controls -->
+<div class="card controls">
+    <label>Rooms to book:
+        <input type="number" id="roomCount" min="1" max="5" value="1">
+    </label>
+    <button class="book" onclick="book()">Book</button>
+    <button class="randomize" onclick="randomize()">Randomize</button>
+    <button class="reset" onclick="resetAll()">Reset</button>
+    <button class="reload" onclick="fetchRooms()">Reload</button>
+</div>
+
+<!-- Legend -->
+<div class="legend card">
+    <span style="background:#bbf7d0;border:1px solid #22c55e;">Available</span>
+    <span style="background:#fca5a5;border:1px solid #ef4444;text-decoration:line-through;">Booked</span>
+    <span style="background:#fde047;border:1px solid #facc15;">Just booked</span>
+</div>
+
+<!-- Rooms -->
+<div class="card rooms" id="hotel"></div>
+
+<!-- Raw Response -->
+<div class="card">
+    <h3>Raw API Response</h3>
+    <pre id="apiResponse">{}</pre>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+    const API = '/api';
+
+    function showToast(msg, color="#333") {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.style.background = color;
+        t.style.display = 'block';
+        setTimeout(()=>t.style.display='none', 3000);
+    }
+
+    async function fetchRooms() {
+        const res = await fetch(API + '/rooms');
+        const data = await res.json();
+        render(data);
+    }
+
+    function render(state) {
+        const hotelDiv = document.getElementById('hotel');
+        hotelDiv.innerHTML = '';
+
+        const grouped = {};
+        state.rooms.forEach(r => {
+            if (!grouped[r.floor]) grouped[r.floor] = [];
+            grouped[r.floor].push(r);
+        });
+
+        Object.keys(grouped).sort((a,b)=>a-b).forEach(floor => {
+            const floorDiv = document.createElement('div');
+            floorDiv.className = 'floor';
+            const label = document.createElement('div');
+            label.className = 'floor-label';
+            label.textContent = 'Floor ' + floor;
+            floorDiv.appendChild(label);
+
+            const roomsDiv = document.createElement('div');
+            roomsDiv.className = 'floor-rooms';
+
+            grouped[floor].sort((a,b)=>a.position-b.position).forEach(r => {
+                const div = document.createElement('div');
+                div.className = 'room';
+                div.textContent = r.number;
+                if (r.booked) div.classList.add('booked');
+                else div.classList.add('available');
+                if (state.justBooked.includes(r.number)) {
+                    div.classList.remove('available','booked');
+                    div.classList.add('just');
+                }
+                roomsDiv.appendChild(div);
+            });
+
+            floorDiv.appendChild(roomsDiv);
+            hotelDiv.appendChild(floorDiv);
+        });
+
+        // Summary stats
+        const total = state.rooms.length;
+        const booked = state.rooms.filter(r => r.booked).length;
+        const available = total - booked;
+        const just = state.justBooked.length;
+
+        document.getElementById('total').textContent = total;
+        document.getElementById('available').textContent = available;
+        document.getElementById('booked').textContent = booked;
+        document.getElementById('justBooked').textContent = just;
+
+        // Raw JSON
+        document.getElementById('apiResponse').textContent = JSON.stringify(state, null, 2);
+
+        // Auto-scroll to just booked
+        if (state.justBooked.length > 0) {
+            const bookedRoom = document.querySelector('.just');
+            if (bookedRoom) {
+                bookedRoom.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
+        }
+    }
+
+    async function book() {
+        const count = parseInt(document.getElementById('roomCount').value, 10);
+        if (isNaN(count) || count < 1 || count > 5) {
+            showToast("⚠️ You can book only 1 to 5 rooms!", "#dc2626");
+            return;
+        }
+        try {
+            const res = await fetch(API + '/book?count=' + count, { method:'POST' });
+            if (!res.ok) {
+                const text = await res.text();
+                showToast("❌ Booking failed: " + text, "#dc2626");
+                return;
+            }
+            const data = await res.json();
+            showToast("✅ Successfully booked " + count + " room(s)", "#16a34a");
+            render(data);
+        } catch (e) {
+            showToast("❌ Error while booking: " + e.message, "#dc2626");
+        }
+    }
+
+    async function randomize() {
+        const res = await fetch(API + '/randomize', { method:'POST' });
+        const data = await res.json();
+        showToast("🔀 Hotel randomized", "#4b5563");
+        render(data);
+    }
+
+    async function resetAll() {
+        const res = await fetch(API + '/reset', { method:'POST' });
+        const data = await res.json();
+        showToast("♻️ Hotel reset", "#2563eb");
+        render(data);
+    }
+
+    // Initial load
+    fetchRooms();
+</script>
+</body>
+</html>
